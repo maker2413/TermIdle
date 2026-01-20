@@ -1,0 +1,805 @@
+# Terminal Idle Game Implementation Plan
+
+**Status:** Planning
+**Version:** 1.0
+**Last Updated:** 2026-01-19
+
+### Project Vision
+
+A terminal-based idle game served over SSH using Bubbletea TUI, where players guide a Monkey's journey from randomly hitting keys to becoming an AI programmer. The game combines traditional idle mechanics with a compelling programming evolution story, featuring leaderboards for competitive progression.
+
+---
+
+## Quick Reference
+
+| Component | Technology | Purpose | Status |
+|-----------|------------|---------|---------|
+| Game Server | Go + Bubbletea | Core game logic and TUI | Planning |
+| SSH Server | wish (charmbracelet/wish) | Remote terminal access | Planning |
+| Database | SQLite | Player progress, leaderboards | Planning |
+| Authentication | SSH keys + usernames | Player identification | Planning |
+| API | HTTP/JSON | Leaderboards, player data | Planning |
+
+---
+
+## Phase 1: Core Foundation
+
+**Goal:** Establish basic game structure and infrastructure.
+
+### 1.1 Project Structure
+
+```
+TermIdle/
+├── cmd/
+│   ├── term-idle/          # Main game server
+│   │   └── main.go
+│   └── ssh-server/         # SSH gateway server
+│       └── main.go
+├── internal/
+│   ├── game/              # Core game logic
+│   │   ├── state.go       # Game state management
+│   │   ├── upgrades.go    # Upgrade system
+│   │   ├── production.go  # Resource generation
+│   │   └── story.go       # Story progression
+│   ├── ui/                # Bubbletea components
+│   │   ├── model.go       # Main UI model
+│   │   ├── view.go        # Rendering logic
+│   │   ├── update.go      # Event handling
+│   │   └── components/    # Reusable UI components
+│   ├── ssh/               # SSH server handling
+│   │   ├── server.go      # SSH server setup
+│   │   ├── session.go     # Player session management
+│   │   └── handler.go     # Command processing
+│   ├── db/                # Database layer
+│   │   ├── sqlite.go      # SQLite implementation
+│   │   ├── migrations/    # Database migrations
+│   │   └── models.go      # Data models
+│   └── api/               # HTTP API
+│       ├── server.go      # HTTP server
+│       ├── handlers/      # API endpoints
+│       └── middleware/    # Auth, logging, etc.
+├── pkg/                   # Public packages
+│   ├── client/            # Optional client library
+│   └── protocol/          # Communication protocol
+├── web/                   # Web dashboard (optional)
+│   └── leaderboard/       # Leaderboard interface
+├── configs/               # Configuration files
+├── scripts/               # Build/deployment scripts
+├── docs/                  # Documentation
+└── tests/                 # Integration tests
+```
+
+### 1.2 Core Dependencies
+
+**Required Go modules:**
+```go
+// go.mod
+module github.com/maker2413/term-idle
+
+require (
+    github.com/charmbracelet/bubbletea v0.26.6
+    github.com/charmbracelet/lipgloss v0.10.0
+    github.com/charmbracelet/wish v0.6.0
+    github.com/charmbracelet/log v0.4.0
+    github.com/gorilla/mux v1.8.1
+    github.com/mattn/go-sqlite3 v1.14.22
+    github.com/google/uuid v1.6.0
+    golang.org/x/crypto v0.19.0
+    github.com/stretchr/testify v1.8.4
+)
+```
+
+### 1.3 Database Schema
+
+**Tables to create:**
+```sql
+-- Players
+CREATE TABLE players (
+    id TEXT PRIMARY KEY,
+    username TEXT UNIQUE NOT NULL,
+    ssh_key TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    last_active DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Game State
+CREATE TABLE game_states (
+    player_id TEXT PRIMARY KEY,
+    current_level INTEGER DEFAULT 1,
+    keystrokes INTEGER DEFAULT 0,
+    words INTEGER DEFAULT 0,
+    programs INTEGER DEFAULT 0,
+    ai_automations INTEGER DEFAULT 0,
+    story_progress INTEGER DEFAULT 0,
+    last_save DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (player_id) REFERENCES players(id)
+);
+
+-- Upgrades
+CREATE TABLE player_upgrades (
+    player_id TEXT,
+    upgrade_id TEXT,
+    level INTEGER DEFAULT 0,
+    purchased_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (player_id, upgrade_id),
+    FOREIGN KEY (player_id) REFERENCES players(id)
+);
+
+-- Leaderboards
+CREATE TABLE leaderboard_entries (
+    player_id TEXT,
+    keystrokes_per_second REAL DEFAULT 0,
+    total_keystrokes INTEGER DEFAULT 0,
+    level INTEGER DEFAULT 1,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (player_id) REFERENCES players(id)
+);
+
+-- Story Events
+CREATE TABLE story_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    trigger_level INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    content TEXT NOT NULL,
+    upgrade_unlock TEXT
+);
+```
+
+---
+
+## Phase 2: Game Mechanics
+
+**Goal:** Implement core idle game mechanics.
+
+### 2.1 Resource System
+
+**Primary Resources:**
+- **Keystrokes**: Base currency, generated automatically
+- **Words**: Formed from keystrokes, worth more
+- **Programs**: Created from words, high value
+- **AI Automations**: Ultimate resource, massive production
+
+**Production Formula:**
+```go
+func calculateProduction(state *GameState) float64 {
+    baseProduction := state.KeystrokesPerSecond
+    wordBonus := float64(state.Words) * 1.5
+    programBonus := float64(state.Programs) * 10.0
+    aiBonus := float64(state.AIAutomations) * 100.0
+    
+    return baseProduction + wordBonus + programBonus + aiBonus
+}
+```
+
+### 2.2 Upgrade System
+
+**Upgrade Categories:**
+
+**Monkey Evolution (Story Progression):**
+1. Random Typing → Recognizing Letters
+2. Letter Recognition → Forming Words
+3. Word Formation → Basic Programming
+4. Basic Programming → Advanced Programming
+5. Advanced Programming → AI Creation
+
+**Production Upgrades:**
+- Faster Typing Speed (+keystrokes/sec)
+- Better Vocabulary (+word conversion)
+- Programming Skills (+program value)
+- AI Efficiency (+automation output)
+
+**Special Upgrades:**
+- Code Review (production boost for 60s)
+- Coffee Rush (temporary speed boost)
+- Stack Overflow Help (unlock special upgrades)
+
+### 2.3 Story Integration
+
+**Story Triggers:**
+```go
+type StoryEvent struct {
+    TriggerLevel   int
+    Title         string
+    Content       string
+    UpgradeUnlock string
+}
+
+var storyEvents = []StoryEvent{
+    {1, "The First Key", "Our monkey randomly hits the keyboard. Amazing!", "better_typing"},
+    {10, "Letter Recognition", "The monkey starts recognizing patterns!", "vocabulary_boost"},
+    {25, "First Word", "\"Hello\" appears on screen. Progress!", "word_formation"},
+    {50, "Basic Programming", "Simple loops and functions emerge.", "programming_basics"},
+    {100, "AI Assistant", "The monkey creates its first AI helper!", "ai_automation"},
+    // ... more story beats
+}
+```
+
+---
+
+## Phase 3: SSH Server Implementation
+
+**Goal:** Create robust SSH access using wish.
+
+### 3.1 SSH Server Setup
+
+```go
+// internal/ssh/server.go
+func StartSSHServer(config *Config) error {
+    s, err := wish.NewServer(
+        wish.WithAddress(fmt.Sprintf(":%d", config.SSHPort)),
+        wish.WithHostKeyPEM([]byte(config.HostKey)),
+        wish.WithMiddleware(
+            authMiddleware,
+            sessionMiddleware,
+            gameMiddleware,
+        ),
+    )
+    if err != nil {
+        return fmt.Errorf("failed to create SSH server: %w", err)
+    }
+
+    log.Infof("Starting SSH server on port %d", config.SSHPort)
+    return s.ListenAndServe()
+}
+```
+
+### 3.2 Player Authentication
+
+```go
+// internal/ssh/auth.go
+func authMiddleware(next wish.Middleware) wish.Middleware {
+    return func(sess ssh.Session) {
+        username := sess.User()
+        pk := sess.PublicKey()
+        
+        // Verify user exists and public key matches
+        player, err := db.GetPlayerByUsername(username)
+        if err != nil || !keysMatch(pk, player.SSHKey) {
+            log.Warnf("Failed auth attempt for user %s", username)
+            sess.Exit(1)
+            return
+        }
+        
+        // Set player context
+        sess.Context().SetValue("player_id", player.ID)
+        next(sess)
+    }
+}
+```
+
+### 3.3 Game Session Management
+
+```go
+// internal/ssh/session.go
+func sessionMiddleware(next wish.Middleware) wish.Middleware {
+    return func(sess ssh.Session) {
+        playerID := sess.Context().Value("player_id").(string)
+        
+        // Load game state
+        gameState, err := db.LoadGameState(playerID)
+        if err != nil {
+            gameState = NewGameState(playerID)
+        }
+        
+        // Create Bubbletea program
+        p := tea.NewProgram(NewModel(gameState), tea.WithInput(sess), tea.WithOutput(sess))
+        
+        // Run game in goroutine
+        go func() {
+            _, err := p.Run()
+            if err != nil {
+                log.Errorf("Game session error: %v", err)
+            }
+        }()
+        
+        next(sess)
+    }
+}
+```
+
+---
+
+## Phase 4: Bubbletea UI Implementation
+
+**Goal:** Create responsive terminal UI.
+
+### 4.1 Main Model Structure
+
+```go
+// internal/ui/model.go
+type Model struct {
+    gameState     *game.GameState
+    viewport      tea.Model
+    tabs          tea.Model
+    status        tea.Model
+    notifications []string
+    width, height int
+    lastUpdate    time.Time
+}
+
+func NewModel(state *game.GameState) Model {
+    return Model{
+        gameState:  state,
+        viewport:   viewport.New(0, 0),
+        tabs:       tabs.New("game", "upgrades", "story", "stats"),
+        status:     status.New(state),
+        lastUpdate: time.Now(),
+    }
+}
+```
+
+### 4.2 UI Components
+
+**Game View:**
+- Resource counters and production rates
+- Main action buttons
+- Progress indicators
+- Story snippet area
+
+**Upgrade Shop:**
+- Available upgrades list
+- Cost and benefit display
+- Purchase animations
+- Locked/preview items
+
+**Story View:**
+- Scrollable story text
+- Story timeline
+- Achievement notifications
+- Story progress bar
+
+**Stats View:**
+- Current statistics
+- Historical graphs (ASCII)
+- Leaderboard position
+- Session duration
+
+### 4.3 Rendering System
+
+```go
+// internal/ui/view.go
+func (m Model) View() string {
+    switch m.tabs.(tabs.Model).Active() {
+    case "game":
+        return m.gameView()
+    case "upgrades":
+        return m.upgradesView()
+    case "story":
+        return m.storyView()
+    case "stats":
+        return m.statsView()
+    default:
+        return m.gameView()
+    }
+}
+
+func (m Model) gameView() string {
+    return lipgloss.JoinVertical(
+        lipgloss.Left,
+        m.headerView(),
+        m.resourceView(),
+        m.actionView(),
+        m.storyPreviewView(),
+        m.statusView(),
+    )
+}
+```
+
+---
+
+## Phase 5: Game Loop and Updates
+
+**Goal:** Implement real-time game progression.
+
+### 5.1 Production Ticker
+
+```go
+// internal/game/production.go
+func (g *Game) StartProductionTicker(ctx context.Context) tea.Cmd {
+    return tea.Tick(time.Second, func(t time.Time) tea.Msg {
+        return ProductionTickMsg{Time: t}
+    })
+}
+
+func (m Model) updateProduction(msg ProductionTickMsg) (Model, tea.Cmd) {
+    secondsSinceUpdate := msg.Time.Sub(m.lastUpdate).Seconds()
+    
+    // Calculate production
+    production := m.gameState.CalculateProduction()
+    keystrokesEarned := production * secondsSinceUpdate
+    
+    // Update resources
+    m.gameState.Keystrokes += keystrokesEarned
+    m.gameState.TryUpgradeResources() // Check for word/program formation
+    
+    // Check story triggers
+    if story := m.gameState.CheckStoryTrigger(); story != nil {
+        m.notifications = append(m.notifications, story.Title)
+    }
+    
+    m.lastUpdate = msg.Time
+    return m, nil
+}
+```
+
+### 5.2 Input Handling
+
+```go
+// internal/ui/update.go
+func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+    var cmd tea.Cmd
+    
+    switch msg := msg.(type) {
+    case tea.KeyMsg:
+        switch msg.Type {
+        case tea.KeyEnter, tea.KeySpace:
+            cmd = m.handleAction()
+        case tea.KeyTab:
+            m.tabs = m.tabs.Update(msg)
+        case tea.KeyCtrlC:
+            return m, tea.Quit
+        }
+    case ProductionTickMsg:
+        return m.updateProduction(msg)
+    }
+    
+    m.tabs, cmd = m.tabs.Update(msg)
+    return m, cmd
+}
+```
+
+---
+
+## Phase 6: Leaderboards and Competition
+
+**Goal:** Add competitive elements with leaderboards.
+
+### 6.1 Leaderboard API
+
+```go
+// internal/api/leaderboard.go
+type LeaderboardEntry struct {
+    Username          string  `json:"username"`
+    KeystrokesPerSec  float64 `json:"keystrokes_per_sec"`
+    TotalKeystrokes   int64   `json:"total_keystrokes"`
+    Level             int     `json:"level"`
+    Rank              int     `json:"rank"`
+}
+
+func (s *Server) getLeaderboard(w http.ResponseWriter, r *http.Request) {
+    limit := 50
+    if l := r.URL.Query().Get("limit"); l != "" {
+        if parsed, err := strconv.Atoi(l); err == nil {
+            limit = parsed
+        }
+    }
+    
+    entries, err := s.db.GetLeaderboard(limit)
+    if err != nil {
+        http.Error(w, err.Error(), http.StatusInternalServerError)
+        return
+    }
+    
+    json.NewEncoder(w).Encode(entries)
+}
+```
+
+### 6.2 Leaderboard Display
+
+```go
+// internal/ui/leaderboard.go
+func (m Model) leaderboardView() string {
+    entries, _ := m.getLeaderboard()
+    
+    var builder strings.Builder
+    builder.WriteString(titleStyle.Render("🏆 Leaderboard"))
+    builder.WriteString("\n\n")
+    
+    for i, entry := range entries[:10] { // Top 10
+        rank := fmt.Sprintf("%d.", i+1)
+        if i < 3 {
+            rank = medalEmojis[i] + " " + rank
+        }
+        
+        line := fmt.Sprintf("%-4s %-20s %12.1f/s %10d Lvl:%d",
+            rank,
+            entry.Username,
+            entry.KeystrokesPerSec,
+            entry.TotalKeystrokes,
+            entry.Level,
+        )
+        
+        builder.WriteString(line + "\n")
+    }
+    
+    return builder.String()
+}
+```
+
+---
+
+## Phase 7: Story Content System
+
+**Goal:** Create engaging narrative that integrates with gameplay.
+
+### 7.1 Story Database
+
+```go
+// internal/game/story.go
+type StoryChapter struct {
+    ID           int    `json:"id"`
+    Title        string `json:"title"`
+    Content      string `json:"content"`
+    TriggerLevel int    `json:"trigger_level"`
+    Unlocks      []string `json:"unlocks"`
+}
+
+var storyChapters = []StoryChapter{
+    {
+        ID:           1,
+        Title:        "The Beginning",
+        Content:      "In a digital jungle, a young monkey discovers a keyboard. Random keystrokes echo through the void...",
+        TriggerLevel: 1,
+        Unlocks:      []string{"random_typing"},
+    },
+    {
+        ID:           2,
+        Title:        "Pattern Recognition",
+        Content:      "After countless random taps, the monkey starts seeing patterns. Letters form, then words emerge...",
+        TriggerLevel: 10,
+        Unlocks:      []string{"letter_recognition", "basic_vocabulary"},
+    },
+    // ... more chapters
+}
+```
+
+### 7.2 Story Display System
+
+```go
+// internal/ui/story.go
+func (m Model) storyView() string {
+    currentChapter := m.gameState.GetCurrentChapter()
+    
+    return lipgloss.JoinVertical(
+        lipgloss.Left,
+        storyTitleStyle.Render(currentChapter.Title),
+        "",
+        storyContentStyle.Render(currentChapter.Content),
+        "",
+        storyProgressStyle.Render(fmt.Sprintf("Progress: %d/%d", 
+            m.gameState.StoryProgress, len(storyChapters))),
+    )
+}
+```
+
+---
+
+## Phase 8: Configuration and Deployment
+
+**Goal:** Create production-ready deployment.
+
+### 8.1 Configuration
+
+```yaml
+# config.yaml
+server:
+  port: 8080
+  host: "0.0.0.0"
+
+ssh:
+  port: 2222
+  host_key_file: "/etc/term-idle/host_key"
+  max_sessions: 100
+
+database:
+  path: "./data/term-idle.db"
+  
+game:
+  save_interval: 30s
+  production_tick: 1s
+  max_players: 1000
+
+logging:
+  level: "info"
+  file: "./logs/term-idle.log"
+```
+
+### 8.2 Deployment Script
+
+```bash
+#!/bin/bash
+# scripts/deploy.sh
+
+set -e
+
+echo "Building TermIdle..."
+go build -o bin/term-idle cmd/term-idle/main.go
+go build -o bin/ssh-server cmd/ssh-server/main.go
+
+echo "Running migrations..."
+./bin/term-idle migrate
+
+echo "Starting services..."
+./bin/ssh-server &
+./bin/term-idle &
+
+echo "Deployment complete!"
+echo "SSH: ssh username@localhost -p 2222"
+echo "API: http://localhost:8080"
+```
+
+---
+
+## Phase 9: Testing and Quality Assurance
+
+**Goal:** Ensure robust, bug-free experience.
+
+### 9.1 Unit Tests
+
+```go
+// internal/game/production_test.go
+func TestCalculateProduction(t *testing.T) {
+    state := &GameState{
+        KeystrokesPerSecond: 1.0,
+        Words:              5,
+        Programs:           2,
+        AIAutomations:      1,
+    }
+    
+    expected := 1.0 + 5*1.5 + 2*10.0 + 1*100.0
+    actual := calculateProduction(state)
+    
+    assert.Equal(t, expected, actual)
+}
+```
+
+### 9.2 Integration Tests
+
+```go
+// tests/ssh_test.go
+func TestSSHConnection(t *testing.T) {
+    // Test SSH server startup
+    // Test authentication
+    // Test game session creation
+    // Test production updates
+}
+```
+
+### 9.3 Load Testing
+
+```bash
+# scripts/load_test.sh
+#!/bin/bash
+
+# Simulate 100 concurrent SSH connections
+for i in {1..100}; do
+    (
+        echo "Simulating player $i"
+        ssh -i test_keys/player$i test@localhost -p 2222 -o StrictHostKeyChecking=no &
+    ) &
+done
+
+wait
+echo "Load test complete"
+```
+
+---
+
+## Phase 10: Monitoring and Analytics
+
+**Goal:** Track game performance and player behavior.
+
+### 10.1 Metrics Collection
+
+```go
+// internal/metrics/metrics.go
+var (
+    playersConnected = prometheus.NewGauge(prometheus.GaugeOpts{
+        Name: "term_idle_players_connected",
+        Help: "Number of currently connected players",
+    })
+    
+    totalKeystrokes = prometheus.NewCounter(prometheus.CounterOpts{
+        Name: "term_idle_keystrokes_total",
+        Help: "Total keystrokes across all players",
+    })
+)
+```
+
+### 10.2 Analytics Dashboard
+
+**Key metrics to track:**
+- Daily active players
+- Average session duration
+- Peak concurrent players
+- Progress distribution
+- Most popular upgrades
+- Story completion rates
+
+---
+
+## Implementation Timeline
+
+| Phase | Duration | Priority | Dependencies |
+|-------|----------|----------|-------------|
+| 1. Foundation | 1 week | High | None |
+| 2. Game Mechanics | 2 weeks | High | Phase 1 |
+| 3. SSH Server | 1 week | High | Phase 1 |
+| 4. Bubbletea UI | 2 weeks | High | Phase 1, 2 |
+| 5. Game Loop | 1 week | High | Phase 2, 4 |
+| 6. Leaderboards | 1 week | Medium | Phase 1, 5 |
+| 7. Story System | 2 weeks | Medium | Phase 2, 4 |
+| 8. Deployment | 1 week | Medium | All phases |
+| 9. Testing | 1 week | High | All phases |
+| 10. Monitoring | 1 week | Low | Phase 8 |
+
+**Total estimated time:** 13 weeks
+
+---
+
+## Technical Challenges
+
+### SSH Session Management
+- Handling multiple concurrent connections
+- Maintaining state across reconnections
+- Resource cleanup on disconnection
+
+### Real-time Updates
+- Efficient production calculations
+- Balancing server load with many players
+- Preventing cheating/exploits
+
+### Database Performance
+- Optimizing for high-frequency updates
+- Handling concurrent player saves
+- Leaderboard query optimization
+
+### UI Responsiveness
+- Terminal size compatibility
+- Cross-platform rendering
+- Accessibility considerations
+
+---
+
+## Success Metrics
+
+**Technical Metrics:**
+- < 100ms response time for all inputs
+- Support 100+ concurrent players
+- 99.9% uptime
+- Zero data loss
+
+**Player Metrics:**
+- > 50% story completion rate
+- > 10 minute average session time
+- > 70% player retention after first day
+- Active leaderboard participation
+
+---
+
+## Future Enhancements
+
+### Short Term (Post-MVP)
+- Player profiles and customization
+- Achievement system
+- Special events and challenges
+- Mobile SSH client
+
+### Long Term
+- Guild/team play
+- Mini-games within main game
+- Custom story creation tools
+- Plugin system for community content
+
+---
+
+## Conclusion
+
+This implementation plan provides a comprehensive roadmap for building a terminal-based idle game that combines engaging gameplay with a compelling narrative. The technical architecture is designed for scalability, performance, and maintainability while providing an authentic terminal experience.
+
+The SSH-based delivery model creates a unique, nostalgic gaming experience that stands out from web-based idle games, while the story-driven progression keeps players engaged beyond simple number growth.
+
+By following this phased approach, we can build a robust, feature-rich game that delivers on both the technical requirements and player experience goals.</arg_value>
+</tool_call>
+
+---

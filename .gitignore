@@ -1,0 +1,8 @@
+# Env vars
+.env
+
+# Binaries
+term-idle
+
+# Log files
+debug.log
