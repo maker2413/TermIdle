@@ -1,8 +1,18 @@
 # Terminal Idle Game Implementation Plan
 
-**Status:** Planning
-**Version:** 1.0
+**Status:** Planning\
+**Version:** 1.0\
 **Last Updated:** 2026-01-19
+
+### Recent Progress
+
+**2026-01-19:** Initial project planning ✅ DOCUMENTATION
+- Created comprehensive implementation plan for terminal-based idle game
+- Defined project structure and technical architecture
+- Outlined 10-phase development approach with Go + Bubbletea + SSH
+- Planned Monkey evolution story from random typing to AI programming
+- Designed competitive leaderboard system
+- Total estimated effort: 13 weeks
 
 ### Project Vision
 
@@ -26,8 +36,15 @@ A terminal-based idle game served over SSH using Bubbletea TUI, where players gu
 
 **Goal:** Establish basic game structure and infrastructure.
 
+**Status:** Planning
+
+**Estimated Effort:** 1 week
+
 ### 1.1 Project Structure
 
+**Status:** Planning
+
+**Implementation:**
 ```
 TermIdle/
 ├── cmd/
@@ -69,7 +86,15 @@ TermIdle/
 └── tests/                 # Integration tests
 ```
 
+**Checklist:**
+- [ ] Create basic project directory structure
+- [ ] Initialize Go module
+- [ ] Set up Makefile with build commands
+- [ ] Create placeholder files for main components
+
 ### 1.2 Core Dependencies
+
+**Status:** Planning
 
 **Required Go modules:**
 ```go
@@ -89,7 +114,15 @@ require (
 )
 ```
 
+**Checklist:**
+- [ ] Initialize go.mod with required dependencies
+- [ ] Set up go.sum verification
+- [ ] Create vendor directory if needed
+- [ ] Verify all dependencies compile
+
 ### 1.3 Database Schema
+
+**Status:** Planning
 
 **Tables to create:**
 ```sql
@@ -145,13 +178,28 @@ CREATE TABLE story_events (
 );
 ```
 
+**Checklist:**
+- [ ] Create database migration file
+- [ ] Implement schema creation scripts
+- [ ] Add indexes for performance
+- [ ] Create data access layer
+- [ ] Add foreign key constraints
+
 ---
 
 ## Phase 2: Game Mechanics
 
 **Goal:** Implement core idle game mechanics.
 
+**Status:** Planning
+
+**Estimated Effort:** 2 weeks
+
+**Dependencies:** Phase 1
+
 ### 2.1 Resource System
+
+**Status:** Planning
 
 **Primary Resources:**
 - **Keystrokes**: Base currency, generated automatically
@@ -171,7 +219,16 @@ func calculateProduction(state *GameState) float64 {
 }
 ```
 
+**Checklist:**
+- [ ] Implement resource types and constants
+- [ ] Create production calculation functions
+- [ ] Add resource conversion mechanics
+- [ ] Implement upgrade cost calculations
+- [ ] Add unit tests for production formulas
+
 ### 2.2 Upgrade System
+
+**Status:** Planning
 
 **Upgrade Categories:**
 
@@ -193,7 +250,16 @@ func calculateProduction(state *GameState) float64 {
 - Coffee Rush (temporary speed boost)
 - Stack Overflow Help (unlock special upgrades)
 
+**Checklist:**
+- [ ] Define upgrade types and categories
+- [ ] Implement upgrade purchase logic
+- [ ] Create upgrade effect calculations
+- [ ] Add temporary upgrade system
+- [ ] Implement upgrade progression validation
+
 ### 2.3 Story Integration
+
+**Status:** Planning
 
 **Story Triggers:**
 ```go
@@ -214,13 +280,28 @@ var storyEvents = []StoryEvent{
 }
 ```
 
+**Checklist:**
+- [ ] Define story event structures
+- [ ] Implement story trigger detection
+- [ ] Create story content management
+- [ ] Add story progression tracking
+- [ ] Implement story-unlock system
+
 ---
 
 ## Phase 3: SSH Server Implementation
 
 **Goal:** Create robust SSH access using wish.
 
+**Status:** Planning
+
+**Estimated Effort:** 1 week
+
+**Dependencies:** Phase 1
+
 ### 3.1 SSH Server Setup
+
+**Status:** Planning
 
 ```go
 // internal/ssh/server.go
@@ -243,7 +324,16 @@ func StartSSHServer(config *Config) error {
 }
 ```
 
+**Checklist:**
+- [ ] Set up wish SSH server
+- [ ] Configure host key management
+- [ ] Implement middleware chain
+- [ ] Add graceful shutdown handling
+- [ ] Add logging and monitoring
+
 ### 3.2 Player Authentication
+
+**Status:** Planning
 
 ```go
 // internal/ssh/auth.go
@@ -267,7 +357,16 @@ func authMiddleware(next wish.Middleware) wish.Middleware {
 }
 ```
 
+**Checklist:**
+- [ ] Implement SSH key authentication
+- [ ] Add player verification logic
+- [ ] Create user registration flow
+- [ ] Add session context management
+- [ ] Implement auth failure logging
+
 ### 3.3 Game Session Management
+
+**Status:** Planning
 
 ```go
 // internal/ssh/session.go
@@ -297,13 +396,28 @@ func sessionMiddleware(next wish.Middleware) wish.Middleware {
 }
 ```
 
+**Checklist:**
+- [ ] Implement session state loading
+- [ ] Create Bubbletea program integration
+- [ ] Add session cleanup handling
+- [ ] Implement reconnection support
+- [ ] Add session monitoring
+
 ---
 
 ## Phase 4: Bubbletea UI Implementation
 
 **Goal:** Create responsive terminal UI.
 
+**Status:** Planning
+
+**Estimated Effort:** 2 weeks
+
+**Dependencies:** Phase 1, 2
+
 ### 4.1 Main Model Structure
+
+**Status:** Planning
 
 ```go
 // internal/ui/model.go
@@ -327,6 +441,13 @@ func NewModel(state *game.GameState) Model {
     }
 }
 ```
+
+**Checklist:**
+- [ ] Create main UI model structure
+- [ ] Implement tab navigation system
+- [ ] Add responsive layout handling
+- [ ] Create notification system
+- [ ] Add window resize handling
 
 ### 4.2 UI Components
 
@@ -391,7 +512,15 @@ func (m Model) gameView() string {
 
 **Goal:** Implement real-time game progression.
 
+**Status:** Planning
+
+**Estimated Effort:** 1 week
+
+**Dependencies:** Phase 2, 4
+
 ### 5.1 Production Ticker
+
+**Status:** Planning
 
 ```go
 // internal/game/production.go
@@ -421,6 +550,13 @@ func (m Model) updateProduction(msg ProductionTickMsg) (Model, tea.Cmd) {
     return m, nil
 }
 ```
+
+**Checklist:**
+- [ ] Implement production ticker system
+- [ ] Add resource update logic
+- [ ] Create story trigger detection
+- [ ] Add notification handling
+- [ ] Optimize performance for concurrent players
 
 ### 5.2 Input Handling
 
@@ -453,6 +589,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 ## Phase 6: Leaderboards and Competition
 
 **Goal:** Add competitive elements with leaderboards.
+
+**Status:** Planning
+
+**Estimated Effort:** 1 week
+
+**Dependencies:** Phase 1, 5
 
 ### 6.1 Leaderboard API
 
@@ -522,6 +664,12 @@ func (m Model) leaderboardView() string {
 
 **Goal:** Create engaging narrative that integrates with gameplay.
 
+**Status:** Planning
+
+**Estimated Effort:** 2 weeks
+
+**Dependencies:** Phase 2, 4
+
 ### 7.1 Story Database
 
 ```go
@@ -577,6 +725,12 @@ func (m Model) storyView() string {
 ## Phase 8: Configuration and Deployment
 
 **Goal:** Create production-ready deployment.
+
+**Status:** Planning
+
+**Estimated Effort:** 1 week
+
+**Dependencies:** All phases
 
 ### 8.1 Configuration
 
@@ -634,6 +788,12 @@ echo "API: http://localhost:8080"
 
 **Goal:** Ensure robust, bug-free experience.
 
+**Status:** Planning
+
+**Estimated Effort:** 1 week
+
+**Dependencies:** All phases
+
 ### 9.1 Unit Tests
 
 ```go
@@ -689,6 +849,12 @@ echo "Load test complete"
 
 **Goal:** Track game performance and player behavior.
 
+**Status:** Planning
+
+**Estimated Effort:** 1 week
+
+**Dependencies:** Phase 8
+
 ### 10.1 Metrics Collection
 
 ```go
@@ -720,20 +886,57 @@ var (
 
 ## Implementation Timeline
 
-| Phase | Duration | Priority | Dependencies |
-|-------|----------|----------|-------------|
-| 1. Foundation | 1 week | High | None |
-| 2. Game Mechanics | 2 weeks | High | Phase 1 |
-| 3. SSH Server | 1 week | High | Phase 1 |
-| 4. Bubbletea UI | 2 weeks | High | Phase 1, 2 |
-| 5. Game Loop | 1 week | High | Phase 2, 4 |
-| 6. Leaderboards | 1 week | Medium | Phase 1, 5 |
-| 7. Story System | 2 weeks | Medium | Phase 2, 4 |
-| 8. Deployment | 1 week | Medium | All phases |
-| 9. Testing | 1 week | High | All phases |
-| 10. Monitoring | 1 week | Low | Phase 8 |
+| Phase | Description | Status | Estimated Effort |
+|-------|-------------|--------|------------------|
+| 1. Foundation | Project structure, dependencies, database schema | Planning | 1 week |
+| 2. Game Mechanics | Resource system, upgrades, story integration | Planning | 2 weeks |
+| 3. SSH Server | Authentication, session management, wish integration | Planning | 1 week |
+| 4. Bubbletea UI | Terminal UI components, responsive design | Planning | 2 weeks |
+| 5. Game Loop | Real-time updates, production ticker, event handling | Planning | 1 week |
+| 6. Leaderboards | Competitive ranking, API endpoints, display | Planning | 1 week |
+| 7. Story System | Narrative content, triggers, progression | Planning | 2 weeks |
+| 8. Deployment | Configuration, scripts, production setup | Planning | 1 week |
+| 9. Testing | Unit tests, integration tests, load testing | Planning | 1 week |
+| 10. Monitoring | Metrics collection, analytics, dashboards | Planning | 1 week |
 
-**Total estimated time:** 13 weeks
+**Total estimated effort:** 13 weeks
+
+---
+
+## Build Order
+
+```
+Phase 1: Foundation (no deps)
+    ↓
+Phase 2: Game Mechanics (depends on Phase 1)
+Phase 3: SSH Server (depends on Phase 1)
+    ↓
+Phase 4: Bubbletea UI (depends on Phase 1, 2)
+Phase 5: Game Loop (depends on Phase 2, 4)
+    ↓
+Phase 6: Leaderboards (depends on Phase 1, 5)
+Phase 7: Story System (depends on Phase 2, 4)
+    ↓
+Phase 8: Deployment (depends on all phases)
+Phase 9: Testing (depends on all phases)
+Phase 10: Monitoring (depends on Phase 8)
+```
+
+---
+
+## Success Metrics
+
+**Technical Metrics:**
+- < 100ms response time for all inputs
+- Support 100+ concurrent players
+- 99.9% uptime
+- Zero data loss
+
+**Player Metrics:**
+- > 50% story completion rate
+- > 10 minute average session time
+- > 70% player retention after first day
+- Active leaderboard participation
 
 ---
 
@@ -774,6 +977,46 @@ var (
 - > 10 minute average session time
 - > 70% player retention after first day
 - Active leaderboard participation
+
+---
+
+## Future Enhancements
+
+### Short Term (Post-MVP)
+- Player profiles and customization
+- Achievement system
+- Special events and challenges
+- Mobile SSH client
+
+### Long Term
+- Guild/team play
+- Mini-games within main game
+- Custom story creation tools
+- Plugin system for community content
+
+---
+
+## Technical Challenges
+
+### SSH Session Management
+- Handling multiple concurrent connections
+- Maintaining state across reconnections
+- Resource cleanup on disconnection
+
+### Real-time Updates
+- Efficient production calculations
+- Balancing server load with many players
+- Preventing cheating/exploits
+
+### Database Performance
+- Optimizing for high-frequency updates
+- Handling concurrent player saves
+- Leaderboard query optimization
+
+### UI Responsiveness
+- Terminal size compatibility
+- Cross-platform rendering
+- Accessibility considerations
 
 ---
 
