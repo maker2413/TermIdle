@@ -1,0 +1,103 @@
+# Git
+.git
+.gitignore
+
+# Documentation
+README.md
+docs/
+*.md
+
+# Test files
+tests/
+*_test.go
+coverage.out
+coverage.html
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Build artifacts
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Log files
+*.log
+logs/
+
+# Database files (development)
+*.db
+*.sqlite
+*.sqlite3
+
+# SSH keys (development)
+ssh_host_key*
+*_key
+*.pem
+
+# Configuration overrides (development)
+config.local.yaml
+.env.local
+
+# Dependencies (cached)
+vendor/
+
+# Go specific
+*.out
+go.work
+go.work.sum
+
+# Development scripts
+scripts/load_test.sh
+scripts/deploy.sh
+
+# Docker files
+Dockerfile*
+docker-compose*
+.dockerignore
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+
+# Monitoring and metrics
+prometheus.yml
+grafana/
+
+# Backup files
+*.bak
+*.backup
+
+# Profiling data
+*.prof
+*.pprof
+
+# Coverage files
+coverage.txt
+coverage.xml
+
+# Lint and formatting cache
+.golangci.yml
+.cache/
