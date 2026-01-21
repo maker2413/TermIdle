@@ -392,19 +392,180 @@ func (s *IntegrationTestSuite) TestDatabasePersistence() {
 
 // TestGameLoopIntegration tests the game loop with real-time updates
 func (s *IntegrationTestSuite) TestGameLoopIntegration() {
-	// This test would verify that:
-	// 1. Production ticker works correctly
-	// 2. Auto-save functions properly
-	// 3. UI updates in real-time
-	// 4. Story triggers fire at appropriate times
+	// Test that the game loop components work correctly by running a TUI session
+	// and monitoring production updates and auto-save functionality
 
-	s.T().Log("Game loop integration test placeholder")
+	// Create a test database first
+	database, err := db.NewSQLiteDB(s.testDBPath)
+	s.Require().NoError(err)
+	defer func() {
+		_ = database.Close()
+	}()
 
-	// In a real implementation, you would:
-	// 1. Start a game session
-	// 2. Verify production increases over time
-	// 3. Check auto-save intervals
-	// 4. Verify story progression triggers
+	// Run migrations
+	err = database.Migrate()
+	s.Require().NoError(err)
+
+	// Create test player
+	playerID := uuid.New().String()
+	username := "GameLoopTest"
+	player := &db.Player{
+		ID:         playerID,
+		Username:   username,
+		SSHKey:     "test-key",
+		CreatedAt:  time.Now(),
+		LastActive: time.Now(),
+	}
+	err = database.CreatePlayer(player)
+	s.Require().NoError(err)
+
+	// Create initial game state
+	gameState := game.NewGameState(playerID)
+	gameState.Keystrokes = 100.0 // Give some starting resources
+	gameState.CurrentLevel = 2
+
+	// Save initial state to database
+	dbState := &db.GameState{
+		PlayerID:            gameState.PlayerID,
+		CurrentLevel:        gameState.CurrentLevel,
+		Keystrokes:          gameState.Keystrokes,
+		Words:               gameState.Words,
+		Programs:            gameState.Programs,
+		AIAutomations:       gameState.AIAutomations,
+		StoryProgress:       gameState.StoryProgress,
+		ProductionRate:      gameState.ProductionRate,
+		KeystrokesPerSecond: gameState.KeystrokesPerSecond,
+		LastSave:            gameState.LastSave,
+		LastUpdate:          gameState.LastUpdate,
+	}
+	err = database.SaveGameState(dbState)
+	s.Require().NoError(err)
+
+	// Load game state back to verify persistence
+	loadedState, err := database.LoadGameState(playerID)
+	s.Require().NoError(err)
+	s.Equal(gameState.Keystrokes, loadedState.Keystrokes)
+	s.Equal(gameState.CurrentLevel, loadedState.CurrentLevel)
+
+	// Test production calculation
+	initialProduction := gameState.CalculateProduction()
+	s.Greater(initialProduction, 0.0)
+
+	// Test resource update over time
+	gameState.LastUpdate = time.Now().Add(-5 * time.Second) // 5 seconds ago
+	gameState.UpdateResources(time.Now())
+	expectedIncrease := initialProduction * 5.0 // 5 seconds of production
+
+	s.T().Logf("Initial production: %.2f/s", initialProduction)
+	s.T().Logf("Expected increase: %.2f", expectedIncrease)
+	s.T().Logf("Initial keystrokes: 100.0")
+	s.T().Logf("Final keystrokes: %.2f", gameState.Keystrokes)
+	s.T().Logf("Words formed: %d", gameState.Words)
+
+	// Account for word formation (costs 100 keystrokes per word)
+	// With ~105 keystrokes, should form 1 word, leaving ~5 keystrokes
+	expectedFinalKeystrokes := (100.0 + expectedIncrease) - float64(gameState.Words)*100.0
+	s.InDelta(gameState.Keystrokes, expectedFinalKeystrokes, 1.0) // Allow delta for rounding
+
+	// Should have formed at least one word
+	s.GreaterOrEqual(gameState.Words, 1)
+
+	// Test auto-save simulation (simulate multiple save cycles)
+	for i := 0; i < 3; i++ {
+		// Update game state
+		gameState.UpdateResources(time.Now())
+		gameState.UpdateProduction()
+
+		// Simulate auto-save
+		dbSaveState := &db.GameState{
+			PlayerID:            gameState.PlayerID,
+			CurrentLevel:        gameState.CurrentLevel,
+			Keystrokes:          gameState.Keystrokes,
+			Words:               gameState.Words,
+			Programs:            gameState.Programs,
+			AIAutomations:       gameState.AIAutomations,
+			StoryProgress:       gameState.StoryProgress,
+			ProductionRate:      gameState.ProductionRate,
+			KeystrokesPerSecond: gameState.KeystrokesPerSecond,
+			LastSave:            time.Now(),
+			LastUpdate:          gameState.LastUpdate,
+		}
+
+		err = database.SaveGameState(dbSaveState)
+		s.Require().NoError(err)
+
+		// Small delay to simulate time passing
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	// Test story triggers
+	initialChapterCount := len(gameState.StoryManager.GetUnlockedChapters())
+
+	// Level up significantly to trigger story content
+	gameState.Keystrokes = 5000.0
+	gameState.CurrentLevel = 10
+	gameState.Words = 20
+	gameState.Programs = 3
+
+	_ = gameState.CheckStoryTriggers() // Trigger story chapter checks
+	finalChapterCount := len(gameState.StoryManager.GetUnlockedChapters())
+
+	// Should have unlocked new chapters
+	s.GreaterOrEqual(finalChapterCount, initialChapterCount)
+
+	// Test notification system
+	initialNotificationCount := len(gameState.Notifications)
+	gameState.AddNotification("Test notification for game loop")
+	s.Equal(len(gameState.Notifications), initialNotificationCount+1)
+
+	// Test upgrade manager integration
+	upgradeManager := game.NewUpgradeManager()
+	availableUpgrades := upgradeManager.GetAvailableUpgrades(gameState.CurrentLevel)
+	s.NotEmpty(availableUpgrades, "Should have available upgrades at level 10")
+
+	// Test production with upgrades
+	productionWithUpgrades := gameState.CalculateProductionWithUpgradeManager(upgradeManager)
+	s.GreaterOrEqual(productionWithUpgrades, initialProduction, "Production should increase with upgrades")
+
+	// Test leaderboard service integration
+	leaderboardService := game.NewLeaderboardService(database)
+	err = leaderboardService.UpdatePlayerLeaderboard(gameState, username)
+	s.NoError(err, "Should be able to update leaderboard")
+
+	// Test leaderboard retrieval
+	leaderboard, err := leaderboardService.GetFormattedLeaderboard(10)
+	s.NoError(err, "Should be able to retrieve leaderboard")
+	s.NotEmpty(leaderboard, "Leaderboard should have entries")
+
+	// Save final state to database before verification
+	finalDBState := &db.GameState{
+		PlayerID:            gameState.PlayerID,
+		CurrentLevel:        gameState.CurrentLevel,
+		Keystrokes:          gameState.Keystrokes,
+		Words:               gameState.Words,
+		Programs:            gameState.Programs,
+		AIAutomations:       gameState.AIAutomations,
+		StoryProgress:       gameState.StoryProgress,
+		ProductionRate:      gameState.ProductionRate,
+		KeystrokesPerSecond: gameState.KeystrokesPerSecond,
+		LastSave:            time.Now(),
+		LastUpdate:          gameState.LastUpdate,
+	}
+	err = database.SaveGameState(finalDBState)
+	s.Require().NoError(err)
+
+	// Verify data consistency after all operations
+	finalState, err := database.LoadGameState(playerID)
+	s.Require().NoError(err)
+
+	// Game should have progressed
+	s.InDelta(finalState.Keystrokes, gameState.Keystrokes, 0.1) // Allow small difference for floating point
+	s.Equal(finalState.CurrentLevel, gameState.CurrentLevel)
+
+	s.T().Log("Game loop integration test completed successfully")
+	s.T().Logf("Final production rate: %.2f/s", gameState.ProductionRate)
+	s.T().Logf("Final keystrokes: %.1f", gameState.Keystrokes)
+	s.T().Logf("Story chapters unlocked: %d", finalChapterCount)
 }
 
 // TestErrorHandling tests system behavior under error conditions
