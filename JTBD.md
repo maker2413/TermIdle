@@ -553,11 +553,112 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 **Goal:** Add competitive elements with leaderboards.
 
-**Status:** Planning
+**Status:** ✅ IMPLEMENTED
+
+**Completed:** 2026-01-20
 
 **Estimated Effort:** 1 week
 
 **Dependencies:** Phase 1, 5
+
+### 6.1 Leaderboard API
+
+**Status:** ✅ IMPLEMENTED
+
+**Completed:** 2026-01-20
+
+**Implementation:**
+- Completed HTTP API server with Gorilla Mux routing
+- Implemented GET /api/leaderboard endpoint with limit and sorting
+- Implemented GET /api/leaderboard/player/{id} for player rank lookup  
+- Implemented GET /api/players/{id} and GET /api/players/username/{name} for player data
+- Implemented POST /api/players/{id}/leaderboard for updating player stats
+- Added CORS middleware and logging middleware
+- Included health check endpoint at /api/health
+- Built comprehensive error handling with proper JSON responses
+
+**Checklist:**
+- [x] Create HTTP API server structure
+- [x] Implement leaderboard retrieval endpoint
+- [x] Add player rank lookup endpoint
+- [x] Create player data endpoints
+- [x] Add leaderboard update endpoint
+- [x] Implement CORS and logging middleware
+- [x] Add error handling and validation
+- [x] Create API response types
+
+### 6.2 Leaderboard Display
+
+**Status:** ✅ IMPLEMENTED
+
+**Completed:** 2026-01-20
+
+**Implementation:**
+- Enhanced Stats tab to display top 10 leaderboard entries
+- Added real-time leaderboard refresh with [R] key
+- Integrated medal emojis (🥇🥈🥉) for top 3 players
+- Display player production rate and level in leaderboard
+- Added player-specific stats section above leaderboard
+- Implemented leaderboard service layer for data management
+- Added periodic leaderboard updates every 30 seconds
+- Created leaderboard entry formatting and display logic
+
+**Checklist:**
+- [x] Implement leaderboard service layer
+- [x] Integrate leaderboard into UI stats tab
+- [x] Add leaderboard refresh functionality
+- [x] Display top players with ranks and stats
+- [x] Add player position and surrounding players
+- [x] Implement periodic leaderboard updates
+- [x] Add visual elements (medals, formatting)
+
+### 6.3 Database Layer
+
+**Status:** ✅ IMPLEMENTED
+
+**Completed:** 2026-01-20
+
+**Implementation:**
+- Completed SQLite database implementation with full schema
+- Implemented players table with authentication and profile data
+- Created game_states table for current game progress
+- Built leaderboard_entries table with competitive rankings
+- Added proper indexes for performance optimization
+- Implemented database interface for dependency injection
+- Created data models for players, game states, and leaderboards
+- Added comprehensive database operations (CRUD)
+
+**Checklist:**
+- [x] Create database schema with migrations
+- [x] Implement player data operations
+- [x] Add game state persistence
+- [x] Build leaderboard storage and retrieval
+- [x] Add database indexes for performance
+- [x] Create database interface for testing
+- [x] Implement connection management and cleanup
+
+### 6.4 Testing Coverage
+
+**Status:** ✅ IMPLEMENTED
+
+**Completed:** 2026-01-20
+
+**Implementation:**
+- Created comprehensive unit tests for database layer
+- Built integration tests for API endpoints
+- Added mock database for API testing
+- Tested all database operations (players, game states, leaderboards)
+- Verified API responses and error handling
+- Added persistence tests for database durability
+- Created leaderboard ranking and sorting tests
+
+**Checklist:**
+- [x] Write database unit tests
+- [x] Create API integration tests
+- [x] Add mock implementations for testing
+- [x] Test database persistence and operations
+- [x] Verify API endpoints and responses
+- [x] Test error handling and edge cases
 
 ### 6.1 Leaderboard API
 
@@ -856,7 +957,7 @@ var (
 | 3. SSH Server | Authentication, session management, wish integration | Planning | 1 week |
 | 4. Bubbletea UI | Terminal UI components, responsive design | ✅ COMPLETED | 2 weeks |
 | 5. Game Loop | Real-time updates, production ticker, event handling | ✅ COMPLETED (Basic) | 1 week |
-| 6. Leaderboards | Competitive ranking, API endpoints, display | Planning | 1 week |
+| 6. Leaderboards | Competitive ranking, API endpoints, display | ✅ IMPLEMENTED | 1 week |
 | 7. Story System | Narrative content, triggers, progression | 🔄 PARTIAL | 2 weeks |
 | 8. Deployment | Configuration, scripts, production setup | Planning | 1 week |
 | 9. Testing | Unit tests, integration tests, load testing | ✅ COMPLETED (Unit) | 1 week |

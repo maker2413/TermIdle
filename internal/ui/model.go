@@ -11,13 +11,16 @@ import (
 
 // Model represents the main UI model
 type Model struct {
-	gameState       *game.GameState
-	upgradeManager  *game.UpgradeManager
-	width, height   int
-	quitting        bool
-	lastUpdate      time.Time
-	activeTab       string
-	selectedUpgrade int
+	gameState          *game.GameState
+	upgradeManager     *game.UpgradeManager
+	leaderboardService *game.LeaderboardService
+	width, height      int
+	quitting           bool
+	lastUpdate         time.Time
+	activeTab          string
+	selectedUpgrade    int
+	leaderboardEntries []*game.LeaderboardEntry
+	playerUsername     string
 }
 
 // GetGameState returns a copy of the current game state (for testing)
@@ -64,13 +67,47 @@ var (
 // NewModel creates a new UI model with the given game state
 func NewModel(gameState *game.GameState) Model {
 	return Model{
-		gameState:       gameState,
-		upgradeManager:  game.NewUpgradeManager(),
-		lastUpdate:      time.Now(),
-		activeTab:       "game",
-		quitting:        false,
-		selectedUpgrade: 0,
+		gameState:          gameState,
+		upgradeManager:     game.NewUpgradeManager(),
+		lastUpdate:         time.Now(),
+		activeTab:          "game",
+		quitting:           false,
+		selectedUpgrade:    0,
+		leaderboardEntries: make([]*game.LeaderboardEntry, 0),
+		playerUsername:     "Player", // Will be set from SSH session
 	}
+}
+
+// NewModelWithLeaderboard creates a new UI model with leaderboard support
+func NewModelWithLeaderboard(gameState *game.GameState, leaderboardService *game.LeaderboardService, username string) Model {
+	model := NewModel(gameState)
+	model.leaderboardService = leaderboardService
+	model.playerUsername = username
+	return model
+}
+
+// UpdateLeaderboard refreshes the leaderboard data
+func (m *Model) UpdateLeaderboard() error {
+	if m.leaderboardService == nil {
+		return nil
+	}
+
+	entries, err := m.leaderboardService.GetFormattedLeaderboard(10)
+	if err != nil {
+		return err
+	}
+
+	m.leaderboardEntries = entries
+	return nil
+}
+
+// UpdatePlayerLeaderboard updates the current player's leaderboard entry
+func (m *Model) UpdatePlayerLeaderboard() error {
+	if m.leaderboardService == nil {
+		return nil
+	}
+
+	return m.leaderboardService.UpdatePlayerLeaderboard(m.gameState, m.playerUsername)
 }
 
 // Init initializes the model
@@ -97,6 +134,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.handleUpgradePurchase()
 			} else {
 				m.handleAction()
+			}
+		case tea.KeyRunes:
+			if len(msg.Runes) > 0 {
+				switch msg.Runes[0] {
+				case 'r', 'R':
+					if m.activeTab == "stats" {
+						m.UpdateLeaderboard()
+					}
+				}
 			}
 		case tea.KeyUp:
 			if m.activeTab == "upgrades" {
@@ -342,17 +388,42 @@ func (m Model) renderStoryView() string {
 
 // renderStatsView renders the statistics view
 func (m Model) renderStatsView() string {
-	title := titleStyle.Render("📊 Statistics")
+	title := titleStyle.Render("📊 Statistics & Leaderboard")
 	content := title + "\n\n"
 
-	content += fmt.Sprintf("Current Level: %d\n", m.gameState.CurrentLevel)
-	content += fmt.Sprintf("Total Keystrokes: %.1f\n", m.gameState.Keystrokes)
-	content += fmt.Sprintf("Words Formed: %d\n", m.gameState.Words)
-	content += fmt.Sprintf("Programs Created: %d\n", m.gameState.Programs)
-	content += fmt.Sprintf("AI Automations: %d\n", m.gameState.AIAutomations)
-	content += fmt.Sprintf("Production Rate: %.1f/sec\n", m.gameState.ProductionRate)
+	// Player stats
+	content += "Your Stats:\n"
+	content += fmt.Sprintf("  Level: %d\n", m.gameState.CurrentLevel)
+	content += fmt.Sprintf("  Total Keystrokes: %.1f\n", m.gameState.Keystrokes)
+	content += fmt.Sprintf("  Words Formed: %d\n", m.gameState.Words)
+	content += fmt.Sprintf("  Programs Created: %d\n", m.gameState.Programs)
+	content += fmt.Sprintf("  AI Automations: %d\n", m.gameState.AIAutomations)
+	content += fmt.Sprintf("  Production Rate: %.1f/sec\n", m.gameState.ProductionRate)
+	content += "\n"
 
-	content += "\nLeaderboard coming soon...\n\n"
+	// Leaderboard
+	if len(m.leaderboardEntries) > 0 {
+		content += "🏆 Top Players:\n\n"
+		for _, entry := range m.leaderboardEntries {
+			rankDisplay := fmt.Sprintf("%d.", entry.Rank)
+			if entry.Rank == 1 {
+				rankDisplay = "🥇"
+			} else if entry.Rank == 2 {
+				rankDisplay = "🥈"
+			} else if entry.Rank == 3 {
+				rankDisplay = "🥉"
+			}
+
+			content += fmt.Sprintf("  %s %-20s %12.1f/s Lvl:%d\n",
+				rankDisplay, entry.Username, entry.KeystrokesPerSec, entry.Level)
+		}
+	} else {
+		content += "🏆 Leaderboard (Press R to refresh):\n"
+		content += "  Loading or no data available...\n"
+	}
+
+	content += "\n"
+	content += "Press [R] to refresh leaderboard\n"
 	content += m.renderHelp()
 
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, content)
