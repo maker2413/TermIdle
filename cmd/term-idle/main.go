@@ -4,10 +4,15 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"os"
+	"os/signal"
+	"strconv"
+	"syscall"
 	"time"
 
 	"github.com/charmbracelet/bubbletea"
 	"github.com/google/uuid"
+	"github.com/maker2413/term-idle/internal/api"
 	"github.com/maker2413/term-idle/internal/config"
 	"github.com/maker2413/term-idle/internal/db"
 	gamepkg "github.com/maker2413/term-idle/internal/game"
@@ -17,6 +22,7 @@ import (
 func main() {
 	var configPath = flag.String("config", "", "Path to configuration file")
 	var migrate = flag.Bool("migrate", false, "Run database migrations and exit")
+	var serverMode = flag.Bool("server", false, "Run in API server mode")
 	var username = flag.String("username", "Player", "Username for the player")
 	flag.Parse()
 
@@ -51,6 +57,58 @@ func main() {
 		log.Fatalf("Failed to run database migrations: %v", err)
 	}
 
+	// Check if we should run in server mode
+	if *serverMode {
+		runServerMode(cfg, database)
+		return
+	}
+
+	// Run in normal TUI mode
+	runTUIMode(cfg, database, username)
+}
+
+func runServerMode(cfg *config.Config, database *db.SQLiteDB) {
+	// Parse port from string to int
+	port := 8080 // default
+	if cfg.Server.Port != "" {
+		if p, err := strconv.Atoi(cfg.Server.Port); err == nil {
+			port = p
+		}
+	}
+
+	// Create API server configuration
+	apiConfig := &api.Config{
+		Port: port,
+		Host: cfg.Server.Host,
+	}
+
+	// Create and start API server
+	server := api.NewServer(database, apiConfig)
+
+	// Set up graceful shutdown
+	done := make(chan os.Signal, 1)
+	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+
+	log.Printf("Starting Term Idle API Server")
+	log.Printf("Address: %s:%d", apiConfig.Host, apiConfig.Port)
+
+	// Start server in a goroutine
+	go func() {
+		if err := server.Start(); err != nil {
+			log.Fatalf("Failed to start API server: %v", err)
+		}
+	}()
+
+	log.Println("API server started successfully")
+	log.Println("Press Ctrl+C to stop the server")
+
+	// Wait for interrupt signal
+	<-done
+	log.Println("Shutting down API server...")
+	log.Println("Server stopped")
+}
+
+func runTUIMode(cfg *config.Config, database *db.SQLiteDB, username *string) {
 	// Generate or get player ID
 	playerID := uuid.New().String()
 

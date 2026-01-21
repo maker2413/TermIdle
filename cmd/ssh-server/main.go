@@ -7,38 +7,46 @@ import (
 	"syscall"
 
 	"github.com/charmbracelet/log"
+	"github.com/maker2413/term-idle/internal/config"
 	"github.com/maker2413/term-idle/internal/ssh"
 )
 
 func main() {
-	// Define command line flags
-	var (
-		port        = flag.Int("port", 2222, "SSH server port")
-		hostKeyFile = flag.String("host-key", "./ssh_host_key", "SSH host key file path")
-		maxSessions = flag.Int("max-sessions", 100, "Maximum concurrent sessions")
-		debug       = flag.Bool("debug", false, "Enable debug logging")
-	)
+	var configPath = flag.String("config", "", "Path to configuration file")
 	flag.Parse()
+
+	// Load configuration
+	cfg, err := config.LoadConfig(*configPath)
+	if err != nil {
+		log.Fatalf("Failed to load configuration: %v", err)
+	}
 
 	// Set up logging
 	logger := log.Default()
-	if *debug {
+	switch cfg.Logging.Level {
+	case "debug":
 		logger.SetLevel(log.DebugLevel)
-	} else {
+	case "info":
+		logger.SetLevel(log.InfoLevel)
+	case "warn":
+		logger.SetLevel(log.WarnLevel)
+	case "error":
+		logger.SetLevel(log.ErrorLevel)
+	default:
 		logger.SetLevel(log.InfoLevel)
 	}
 
 	// Create SSH server configuration
-	config := &ssh.Config{
-		Port:        *port,
-		HostKeyFile: *hostKeyFile,
-		MaxSessions: *maxSessions,
+	sshConfig := &ssh.Config{
+		Port:        cfg.SSH.Port,
+		HostKeyFile: cfg.SSH.HostKeyFile,
+		MaxSessions: cfg.SSH.MaxSessions,
 	}
 
 	logger.Infof("Starting Term Idle SSH Server")
-	logger.Infof("Port: %d", config.Port)
-	logger.Infof("Host Key File: %s", config.HostKeyFile)
-	logger.Infof("Max Sessions: %d", config.MaxSessions)
+	logger.Infof("Port: %d", sshConfig.Port)
+	logger.Infof("Host Key File: %s", sshConfig.HostKeyFile)
+	logger.Infof("Max Sessions: %d", sshConfig.MaxSessions)
 
 	// Set up graceful shutdown
 	done := make(chan os.Signal, 1)
@@ -46,7 +54,7 @@ func main() {
 
 	// Start SSH server in a goroutine
 	go func() {
-		if err := ssh.StartSSHServer(config); err != nil {
+		if err := ssh.StartSSHServer(sshConfig); err != nil {
 			logger.Fatalf("Failed to start SSH server: %v", err)
 		}
 	}()
