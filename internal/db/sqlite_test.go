@@ -14,7 +14,7 @@ func TestSQLiteDB_CreatePlayer(t *testing.T) {
 	dbPath := ":memory:"
 	sqliteDB, err := NewSQLiteDB(dbPath)
 	require.NoError(t, err)
-	defer sqliteDB.Close()
+	defer func() { _ = sqliteDB.Close() }()
 
 	// Create a player
 	player := &Player{
@@ -42,7 +42,7 @@ func TestSQLiteDB_GetPlayerByUsername(t *testing.T) {
 	dbPath := ":memory:"
 	sqliteDB, err := NewSQLiteDB(dbPath)
 	require.NoError(t, err)
-	defer sqliteDB.Close()
+	defer func() { _ = sqliteDB.Close() }()
 
 	// Create a player
 	player := &Player{
@@ -69,7 +69,7 @@ func TestSQLiteDB_SaveGameState(t *testing.T) {
 	dbPath := ":memory:"
 	sqliteDB, err := NewSQLiteDB(dbPath)
 	require.NoError(t, err)
-	defer sqliteDB.Close()
+	defer func() { _ = sqliteDB.Close() }()
 
 	// Create a player first
 	player := &Player{
@@ -117,7 +117,7 @@ func TestSQLiteDB_LeaderboardOperations(t *testing.T) {
 	dbPath := ":memory:"
 	sqliteDB, err := NewSQLiteDB(dbPath)
 	require.NoError(t, err)
-	defer sqliteDB.Close()
+	defer func() { _ = sqliteDB.Close() }()
 
 	// Create players
 	player1 := &Player{
@@ -193,18 +193,18 @@ func TestSQLiteDB_Persistence(t *testing.T) {
 	// Create temporary file database
 	tmpFile, err := os.CreateTemp("", "test-*.db")
 	require.NoError(t, err)
-	defer os.Remove(tmpFile.Name())
-	tmpFile.Close()
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
+	_ = tmpFile.Close()
 
 	dbPath := tmpFile.Name()
 	sqliteDB, err := NewSQLiteDB(dbPath)
 	require.NoError(t, err)
-	sqliteDB.Close()
+	_ = sqliteDB.Close()
 
 	// Reopen database
 	sqliteDB, err = NewSQLiteDB(dbPath)
 	require.NoError(t, err)
-	defer sqliteDB.Close()
+	defer func() { _ = sqliteDB.Close() }()
 
 	// Should be able to use it without errors
 	player := &Player{

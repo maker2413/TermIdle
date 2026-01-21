@@ -6,6 +6,7 @@ import (
 
 	"github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/maker2413/term-idle/internal/db"
 	"github.com/maker2413/term-idle/internal/game"
 )
 
@@ -14,9 +15,11 @@ type Model struct {
 	gameState          *game.GameState
 	upgradeManager     *game.UpgradeManager
 	leaderboardService *game.LeaderboardService
+	database           db.Database
 	width, height      int
 	quitting           bool
 	lastUpdate         time.Time
+	lastSave           time.Time
 	activeTab          string
 	selectedUpgrade    int
 	leaderboardEntries []*game.LeaderboardEntry
@@ -31,6 +34,7 @@ func (m Model) GetGameState() game.GameState {
 // Messages for tea updates
 type ProductionTickMsg time.Time
 type GameStateUpdateMsg *game.GameState
+type AutoSaveMsg time.Time
 
 // Styles for the UI
 var (
@@ -70,6 +74,7 @@ func NewModel(gameState *game.GameState) Model {
 		gameState:          gameState,
 		upgradeManager:     game.NewUpgradeManager(),
 		lastUpdate:         time.Now(),
+		lastSave:           time.Now(),
 		activeTab:          "game",
 		quitting:           false,
 		selectedUpgrade:    0,
@@ -83,6 +88,13 @@ func NewModelWithLeaderboard(gameState *game.GameState, leaderboardService *game
 	model := NewModel(gameState)
 	model.leaderboardService = leaderboardService
 	model.playerUsername = username
+	return model
+}
+
+// NewModelWithDatabase creates a new UI model with database support for auto-save
+func NewModelWithDatabase(gameState *game.GameState, database db.Database) Model {
+	model := NewModel(gameState)
+	model.database = database
 	return model
 }
 
@@ -107,14 +119,25 @@ func (m *Model) UpdatePlayerLeaderboard() error {
 		return nil
 	}
 
-	return m.leaderboardService.UpdatePlayerLeaderboard(m.gameState, m.playerUsername)
+	err := m.leaderboardService.UpdatePlayerLeaderboard(m.gameState, m.playerUsername)
+	if err != nil {
+		m.gameState.AddNotification(fmt.Sprintf("❌ Failed to update leaderboard: %v", err))
+	} else {
+		m.gameState.AddNotification("🏆 Leaderboard updated")
+	}
+	return err
 }
 
 // Init initializes the model
 func (m Model) Init() tea.Cmd {
-	return tea.Tick(time.Second, func(t time.Time) tea.Msg {
-		return ProductionTickMsg(t)
-	})
+	return tea.Batch(
+		tea.Tick(time.Second, func(t time.Time) tea.Msg {
+			return ProductionTickMsg(t)
+		}),
+		tea.Tick(30*time.Second, func(t time.Time) tea.Msg {
+			return AutoSaveMsg(t)
+		}),
+	)
 }
 
 // Update handles updates to the model
@@ -140,7 +163,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				switch msg.Runes[0] {
 				case 'r', 'R':
 					if m.activeTab == "stats" {
-						m.UpdateLeaderboard()
+						err := m.UpdateLeaderboard()
+						if err != nil {
+							m.gameState.AddNotification(fmt.Sprintf("❌ Failed to refresh leaderboard: %v", err))
+						}
 					}
 				}
 			}
@@ -176,6 +202,36 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		return m, tea.Tick(time.Second, func(t time.Time) tea.Msg {
 			return ProductionTickMsg(t)
+		})
+
+	case AutoSaveMsg:
+		m.lastSave = time.Time(msg)
+		if m.database != nil {
+			// Save game state to database
+			dbState := &db.GameState{
+				PlayerID:            m.gameState.PlayerID,
+				CurrentLevel:        m.gameState.CurrentLevel,
+				Keystrokes:          m.gameState.Keystrokes,
+				Words:               m.gameState.Words,
+				Programs:            m.gameState.Programs,
+				AIAutomations:       m.gameState.AIAutomations,
+				StoryProgress:       m.gameState.StoryProgress,
+				ProductionRate:      m.gameState.ProductionRate,
+				KeystrokesPerSecond: m.gameState.KeystrokesPerSecond,
+				LastSave:            m.lastSave,
+				LastUpdate:          m.lastUpdate,
+			}
+
+			err := m.database.SaveGameState(dbState)
+			if err != nil {
+				m.gameState.AddNotification(fmt.Sprintf("❌ Auto-save failed: %v", err))
+			} else {
+				m.gameState.AddNotification("💾 Game saved")
+			}
+		}
+
+		return m, tea.Tick(30*time.Second, func(t time.Time) tea.Msg {
+			return AutoSaveMsg(t)
 		})
 	}
 
@@ -440,13 +496,16 @@ func (m Model) renderStatsView() string {
 	if len(m.leaderboardEntries) > 0 {
 		content += "🏆 Top Players:\n\n"
 		for _, entry := range m.leaderboardEntries {
-			rankDisplay := fmt.Sprintf("%d.", entry.Rank)
-			if entry.Rank == 1 {
+			var rankDisplay string
+			switch entry.Rank {
+			case 1:
 				rankDisplay = "🥇"
-			} else if entry.Rank == 2 {
+			case 2:
 				rankDisplay = "🥈"
-			} else if entry.Rank == 3 {
+			case 3:
 				rankDisplay = "🥉"
+			default:
+				rankDisplay = fmt.Sprintf("%d.", entry.Rank)
 			}
 
 			content += fmt.Sprintf("  %s %-20s %12.1f/s Lvl:%d\n",

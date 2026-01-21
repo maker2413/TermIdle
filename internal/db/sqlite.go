@@ -68,7 +68,7 @@ func NewSQLiteDB(dbPath string) (*SQLiteDB, error) {
 
 	// Initialize database schema
 	if err := sqliteDB.initSchema(); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, fmt.Errorf("failed to initialize database schema: %w", err)
 	}
 
@@ -284,7 +284,7 @@ func (s *SQLiteDB) GetLeaderboard(limit int) ([]*LeaderboardEntry, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get leaderboard: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var entries []*LeaderboardEntry
 	for rows.Next() {

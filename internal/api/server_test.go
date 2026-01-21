@@ -103,8 +103,8 @@ func TestGetLeaderboard(t *testing.T) {
 		Rank:             2,
 	}
 
-	mockDB.UpdateLeaderboard(entry1)
-	mockDB.UpdateLeaderboard(entry2)
+	_ = mockDB.UpdateLeaderboard(entry1)
+	_ = mockDB.UpdateLeaderboard(entry2)
 
 	// Create server with mock DB
 	config := &Config{Port: 8080, Host: "localhost"}
