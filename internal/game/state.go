@@ -71,6 +71,11 @@ func NewGameState(playerID string) *GameState {
 
 // CalculateProduction calculates the current production rate based on upgrades and resources
 func (gs *GameState) CalculateProduction() float64 {
+	return gs.CalculateProductionWithUpgradeManager(nil)
+}
+
+// CalculateProductionWithUpgradeManager calculates production using an upgrade manager
+func (gs *GameState) CalculateProductionWithUpgradeManager(um *UpgradeManager) float64 {
 	baseProduction := gs.KeystrokesPerSecond
 	wordBonus := float64(gs.Words) * 1.5
 	programBonus := float64(gs.Programs) * 10.0
@@ -78,8 +83,13 @@ func (gs *GameState) CalculateProduction() float64 {
 
 	// Add upgrade bonuses
 	upgradeBonus := 0.0
-	for _, upgrade := range gs.Upgrades {
-		upgradeBonus += upgrade.Effect
+	if um != nil {
+		upgradeBonus = um.GetUpgradeBonus(gs)
+	} else {
+		// Fallback for backward compatibility
+		for _, upgrade := range gs.Upgrades {
+			upgradeBonus += upgrade.Effect
+		}
 	}
 
 	return baseProduction + wordBonus + programBonus + aiBonus + upgradeBonus

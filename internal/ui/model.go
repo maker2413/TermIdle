@@ -11,11 +11,13 @@ import (
 
 // Model represents the main UI model
 type Model struct {
-	gameState     *game.GameState
-	width, height int
-	quitting      bool
-	lastUpdate    time.Time
-	activeTab     string
+	gameState       *game.GameState
+	upgradeManager  *game.UpgradeManager
+	width, height   int
+	quitting        bool
+	lastUpdate      time.Time
+	activeTab       string
+	selectedUpgrade int
 }
 
 // GetGameState returns a copy of the current game state (for testing)
@@ -62,10 +64,12 @@ var (
 // NewModel creates a new UI model with the given game state
 func NewModel(gameState *game.GameState) Model {
 	return Model{
-		gameState:  gameState,
-		lastUpdate: time.Now(),
-		activeTab:  "game",
-		quitting:   false,
+		gameState:       gameState,
+		upgradeManager:  game.NewUpgradeManager(),
+		lastUpdate:      time.Now(),
+		activeTab:       "game",
+		quitting:        false,
+		selectedUpgrade: 0,
 	}
 }
 
@@ -94,7 +98,23 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.KeyLeft:
 			m.switchTab("prev")
 		case tea.KeyEnter:
-			m.handleAction()
+			if m.activeTab == "upgrades" {
+				m.handleUpgradePurchase()
+			} else {
+				m.handleAction()
+			}
+		case tea.KeyUp:
+			if m.activeTab == "upgrades" {
+				m.selectedUpgrade--
+				if m.selectedUpgrade < 0 {
+					m.selectedUpgrade = len(m.getAvailableUpgrades()) - 1
+				}
+			}
+		case tea.KeyDown:
+			if m.activeTab == "upgrades" {
+				availableUpgrades := m.getAvailableUpgrades()
+				m.selectedUpgrade = (m.selectedUpgrade + 1) % len(availableUpgrades)
+			}
 		}
 
 	case tea.WindowSizeMsg:
@@ -104,6 +124,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case ProductionTickMsg:
 		currentTime := time.Time(msg)
 		m.gameState.UpdateResources(currentTime)
+		m.gameState.UpdateProduction()
 		m.lastUpdate = currentTime
 
 		return m, tea.Tick(time.Second, func(t time.Time) tea.Msg {
@@ -184,7 +205,7 @@ func (m Model) renderHeader() string {
 
 // renderGameArea renders the main game interaction area
 func (m Model) renderGameArea() string {
-	production := m.gameState.CalculateProduction()
+	production := m.gameState.CalculateProductionWithUpgradeManager(m.upgradeManager)
 
 	content := resourceStyle.Render(fmt.Sprintf("Production: %.1f keystrokes/second", production))
 	content += "\n\n"
@@ -241,7 +262,66 @@ func (m Model) renderUpgradesView() string {
 	title := titleStyle.Render("🛠️ Upgrades")
 	content := title + "\n\n"
 
-	content += "Upgrade shop coming soon...\n\n"
+	availableUpgrades := m.getAvailableUpgrades()
+	if len(availableUpgrades) == 0 {
+		content += "No upgrades available yet. Level up to unlock more!\n\n"
+	} else {
+		content += "Available Upgrades:\n\n"
+
+		for i, def := range availableUpgrades {
+			upgradeType := game.UpgradeType(def.ID)
+			canPurchase, _ := m.upgradeManager.CanPurchase(m.gameState, upgradeType)
+
+			// Get current level
+			currentLevel := 0
+			if currentUpgrade, exists := m.gameState.Upgrades[string(upgradeType)]; exists {
+				currentLevel = currentUpgrade.Level
+			}
+
+			// Calculate next level cost
+			nextLevel := currentLevel + 1
+			cost, _ := m.upgradeManager.CalculateCost(upgradeType, nextLevel)
+
+			// Format upgrade line
+			line := ""
+			if i == m.selectedUpgrade {
+				line += "▶ "
+			} else {
+				line += "  "
+			}
+
+			line += fmt.Sprintf("%s (Lv. %d→%d)", def.Name, currentLevel, nextLevel)
+			line += fmt.Sprintf(" - Cost: %.1f keystrokes", cost)
+
+			if currentLevel >= def.MaxLevel {
+				line += " [MAX]"
+			} else if !canPurchase {
+				line += " [❌]"
+			} else {
+				line += " [✅]"
+			}
+
+			if i == m.selectedUpgrade {
+				line = activeTabStyle.Render(line)
+			}
+
+			content += line + "\n"
+			content += fmt.Sprintf("      %s\n", def.Description)
+
+			// Calculate and show effect
+			if currentLevel < def.MaxLevel {
+				effect, _ := m.upgradeManager.CalculateEffect(upgradeType, nextLevel)
+				if effect > 0 {
+					content += fmt.Sprintf("      Effect: +%.1f production\n", effect)
+				}
+			}
+
+			content += "\n"
+		}
+	}
+
+	content += "\n"
+	content += "Use [↑↓] to select, [Enter] to purchase\n"
 	content += m.renderHelp()
 
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, content)
@@ -302,6 +382,27 @@ func (m *Model) switchTab(direction string) {
 	}
 
 	m.activeTab = tabs[currentIndex]
+}
+
+// getAvailableUpgrades returns available upgrades for the current level
+func (m Model) getAvailableUpgrades() []*game.UpgradeDefinition {
+	return m.upgradeManager.GetAvailableUpgrades(m.gameState.CurrentLevel)
+}
+
+// handleUpgradePurchase handles the purchase of the selected upgrade
+func (m *Model) handleUpgradePurchase() {
+	availableUpgrades := m.getAvailableUpgrades()
+	if m.selectedUpgrade >= len(availableUpgrades) {
+		return
+	}
+
+	selectedDef := availableUpgrades[m.selectedUpgrade]
+	upgradeType := game.UpgradeType(selectedDef.ID)
+
+	err := m.upgradeManager.PurchaseUpgrade(m.gameState, upgradeType)
+	if err != nil {
+		m.gameState.AddNotification(fmt.Sprintf("❌ %s", err.Error()))
+	}
 }
 
 // handleAction handles main game actions
