@@ -98,6 +98,15 @@ func NewModelWithDatabase(gameState *game.GameState, database db.Database) Model
 	return model
 }
 
+// NewModelWithAll creates a new UI model with all services (database and leaderboard)
+func NewModelWithAll(gameState *game.GameState, database db.Database, leaderboardService *game.LeaderboardService, username string) Model {
+	model := NewModel(gameState)
+	model.database = database
+	model.leaderboardService = leaderboardService
+	model.playerUsername = username
+	return model
+}
+
 // UpdateLeaderboard refreshes the leaderboard data
 func (m *Model) UpdateLeaderboard() error {
 	if m.leaderboardService == nil {
