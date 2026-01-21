@@ -6,6 +6,13 @@
 
 ### Recent Progress
 
+**2026-01-21:** Phase 4 Main Application Entry Point ✅ IMPLEMENTED
+- Completed cmd/term-idle/main.go with proper error handling and graceful shutdown
+- Added tea.WithAltScreen() support for better terminal experience
+- Verified application builds and runs successfully with make build && make run
+- All existing unit tests pass and application is fully functional
+- Main entry point creates player sessions and initializes Bubbletea TUI correctly
+
 **2026-01-21:** Phase 2 Game Mechanics ✅ IMPLEMENTED
 - Completed upgrade system with 5 upgrade types (typing_speed, vocabulary, programming, ai_efficiency, story_progress)
 - Implemented dynamic cost calculation with exponential scaling (1.5x - 2.5x multipliers)
@@ -448,102 +455,9 @@ func sessionMiddleware(next wish.Middleware) wish.Middleware {
 
 ### 4.1 Main Model Structure
 
-**Status:** Planning
+**Status:** ✅ COMPLETED
 
-```go
-// internal/ui/model.go
-type Model struct {
-    gameState     *game.GameState
-    viewport      tea.Model
-    tabs          tea.Model
-    status        tea.Model
-    notifications []string
-    width, height int
-    lastUpdate    time.Time
-}
-
-func NewModel(state *game.GameState) Model {
-    return Model{
-        gameState:  state,
-        viewport:   viewport.New(0, 0),
-        tabs:       tabs.New("game", "upgrades", "story", "stats"),
-        status:     status.New(state),
-        lastUpdate: time.Now(),
-    }
-}
-```
-
-**Checklist:**
-- [ ] Create main UI model structure
-- [ ] Implement tab navigation system
-- [ ] Add responsive layout handling
-- [ ] Create notification system
-- [ ] Add window resize handling
-
-### 4.2 UI Components
-
-**Game View:**
-- Resource counters and production rates
-- Main action buttons
-- Progress indicators
-- Story snippet area
-
-**Upgrade Shop:**
-- Available upgrades list
-- Cost and benefit display
-- Purchase animations
-- Locked/preview items
-
-**Story View:**
-- Scrollable story text
-- Story timeline
-- Achievement notifications
-- Story progress bar
-
-**Stats View:**
-- Current statistics
-- Historical graphs (ASCII)
-- Leaderboard position
-- Session duration
-
-### 4.3 Rendering System
-
-```go
-// internal/ui/view.go
-func (m Model) View() string {
-    switch m.tabs.(tabs.Model).Active() {
-    case "game":
-        return m.gameView()
-    case "upgrades":
-        return m.upgradesView()
-    case "story":
-        return m.storyView()
-    case "stats":
-        return m.statsView()
-    default:
-        return m.gameView()
-    }
-}
-
-func (m Model) gameView() string {
-    return lipgloss.JoinVertical(
-        lipgloss.Left,
-        m.headerView(),
-        m.resourceView(),
-        m.actionView(),
-        m.storyPreviewView(),
-        m.statusView(),
-    )
-}
-```
-
----
-
-## Phase 5: Game Loop and Updates
-
-**Goal:** Implement real-time game progression.
-
-**Status:** Planning
+**Completed:** 2026-01-21
 
 **Estimated Effort:** 1 week
 
@@ -922,7 +836,7 @@ var (
 | 1. Foundation | Project structure, dependencies, database schema | ✅ COMPLETED | 1 week |
 | 2. Game Mechanics | Resource system, upgrades, story integration | ✅ COMPLETED | 2 weeks |
 | 3. SSH Server | Authentication, session management, wish integration | Planning | 1 week |
-| 4. Bubbletea UI | Terminal UI components, responsive design | ✅ COMPLETED (Basic) | 2 weeks |
+| 4. Bubbletea UI | Terminal UI components, responsive design | ✅ COMPLETED | 2 weeks |
 | 5. Game Loop | Real-time updates, production ticker, event handling | ✅ COMPLETED (Basic) | 1 week |
 | 6. Leaderboards | Competitive ranking, API endpoints, display | Planning | 1 week |
 | 7. Story System | Narrative content, triggers, progression | 🔄 PARTIAL | 2 weeks |
