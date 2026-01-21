@@ -3,6 +3,7 @@ package tests
 import (
 	"context"
 	"fmt"
+	"os"
 	"testing"
 	"time"
 
@@ -24,19 +25,20 @@ type SimpleIntegrationTestSuite struct {
 func (s *SimpleIntegrationTestSuite) SetupSuite() {
 	s.ctx = context.Background()
 
-	// Use in-memory database for testing
-	testDB := ":memory:"
+	// Use temporary file database for testing
+	testDB := "/tmp/test_simple_integration.db"
 
 	var err error
-	s.db, err = db.NewSQLiteDB(testDB)
+	s.db, err = db.NewSQLiteDBWithMigration(testDB)
 	s.Require().NoError(err, "Failed to create test database")
 }
 
 // TearDownSuite runs once after all tests
 func (s *SimpleIntegrationTestSuite) TearDownSuite() {
 	if s.db != nil {
-		s.db.Close()
+		_ = s.db.Close()
 	}
+	_ = os.Remove("/tmp/test_simple_integration.db")
 }
 
 // TestPlayerCreationAndRetrieval tests creating and retrieving players
@@ -240,6 +242,7 @@ func (s *SimpleIntegrationTestSuite) TestStorySystemIntegration() {
 
 	// Test next chapter (requires game state parameter)
 	gameState := game.NewGameState(playerID)
+	gameState.CurrentLevel = 5 // Set level high enough to unlock chapter 2
 	nextChapter := storyManager.GetNextChapter(gameState)
 	s.NotNil(nextChapter, "Should have next chapter")
 	s.Greater(nextChapter.ID, currentChapter.ID, "Next chapter should have higher ID")
@@ -365,7 +368,7 @@ func (s *SimpleIntegrationTestSuite) TestErrorHandling() {
 		LastUpdate: time.Now(),
 	}
 
-	err = s.db.SaveGameState(invalidGameState)
+	_ = s.db.SaveGameState(invalidGameState)
 	// This might or might not error depending on implementation
 	// The test just ensures behavior is consistent
 

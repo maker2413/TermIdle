@@ -12,7 +12,7 @@ import (
 func TestSQLiteDB_CreatePlayer(t *testing.T) {
 	// Create temporary database
 	dbPath := ":memory:"
-	sqliteDB, err := NewSQLiteDB(dbPath)
+	sqliteDB, err := NewSQLiteDBWithMigration(dbPath)
 	require.NoError(t, err)
 	defer func() { _ = sqliteDB.Close() }()
 
@@ -40,7 +40,7 @@ func TestSQLiteDB_CreatePlayer(t *testing.T) {
 func TestSQLiteDB_GetPlayerByUsername(t *testing.T) {
 	// Create temporary database
 	dbPath := ":memory:"
-	sqliteDB, err := NewSQLiteDB(dbPath)
+	sqliteDB, err := NewSQLiteDBWithMigration(dbPath)
 	require.NoError(t, err)
 	defer func() { _ = sqliteDB.Close() }()
 
@@ -67,7 +67,7 @@ func TestSQLiteDB_GetPlayerByUsername(t *testing.T) {
 func TestSQLiteDB_SaveGameState(t *testing.T) {
 	// Create temporary database
 	dbPath := ":memory:"
-	sqliteDB, err := NewSQLiteDB(dbPath)
+	sqliteDB, err := NewSQLiteDBWithMigration(dbPath)
 	require.NoError(t, err)
 	defer func() { _ = sqliteDB.Close() }()
 
@@ -115,7 +115,7 @@ func TestSQLiteDB_SaveGameState(t *testing.T) {
 func TestSQLiteDB_LeaderboardOperations(t *testing.T) {
 	// Create temporary database
 	dbPath := ":memory:"
-	sqliteDB, err := NewSQLiteDB(dbPath)
+	sqliteDB, err := NewSQLiteDBWithMigration(dbPath)
 	require.NoError(t, err)
 	defer func() { _ = sqliteDB.Close() }()
 
@@ -197,7 +197,7 @@ func TestSQLiteDB_Persistence(t *testing.T) {
 	_ = tmpFile.Close()
 
 	dbPath := tmpFile.Name()
-	sqliteDB, err := NewSQLiteDB(dbPath)
+	sqliteDB, err := NewSQLiteDBWithMigration(dbPath)
 	require.NoError(t, err)
 	_ = sqliteDB.Close()
 

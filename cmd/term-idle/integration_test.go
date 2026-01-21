@@ -13,7 +13,7 @@ import (
 func TestDatabaseIntegration(t *testing.T) {
 	// Create temporary database
 	dbPath := ":memory:"
-	database, err := db.NewSQLiteDB(dbPath)
+	database, err := db.NewSQLiteDBWithMigration(dbPath)
 	if err != nil {
 		t.Fatalf("Failed to create database: %v", err)
 	}

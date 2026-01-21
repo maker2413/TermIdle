@@ -39,8 +39,16 @@ func main() {
 
 	// If migrate flag is set, run migrations and exit
 	if *migrate {
+		if err := database.Migrate(); err != nil {
+			log.Fatalf("Failed to run database migrations: %v", err)
+		}
 		fmt.Println("Database migrations completed successfully!")
 		return
+	}
+
+	// Run migrations for normal operation as well
+	if err := database.Migrate(); err != nil {
+		log.Fatalf("Failed to run database migrations: %v", err)
 	}
 
 	// Generate or get player ID

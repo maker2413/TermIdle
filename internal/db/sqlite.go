@@ -27,6 +27,7 @@ type Database interface {
 
 	// Database operations
 	Close() error
+	Migrate() error
 }
 
 // Player represents a player in the system
@@ -66,8 +67,20 @@ func NewSQLiteDB(dbPath string) (*SQLiteDB, error) {
 
 	sqliteDB := &SQLiteDB{db: db}
 
+	return sqliteDB, nil
+}
+
+// NewSQLiteDBWithMigration creates a new SQLite database instance and runs migrations
+func NewSQLiteDBWithMigration(dbPath string) (*SQLiteDB, error) {
+	db, err := sql.Open("sqlite3", dbPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open database: %w", err)
+	}
+
+	sqliteDB := &SQLiteDB{db: db}
+
 	// Initialize database schema
-	if err := sqliteDB.initSchema(); err != nil {
+	if err := sqliteDB.Migrate(); err != nil {
 		_ = db.Close()
 		return nil, fmt.Errorf("failed to initialize database schema: %w", err)
 	}
@@ -75,8 +88,8 @@ func NewSQLiteDB(dbPath string) (*SQLiteDB, error) {
 	return sqliteDB, nil
 }
 
-// initSchema creates the necessary database tables
-func (s *SQLiteDB) initSchema() error {
+// Migrate creates the necessary database tables
+func (s *SQLiteDB) Migrate() error {
 	schema := `
 	CREATE TABLE IF NOT EXISTS players (
 		id TEXT PRIMARY KEY,

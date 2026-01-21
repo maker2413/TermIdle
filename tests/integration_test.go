@@ -59,8 +59,8 @@ func (s *IntegrationTestSuite) TearDownSuite() {
 	s.cleanupTestProcesses()
 
 	// Clean up temporary files
-	os.Remove(s.testDBPath)
-	os.Remove(s.testConfigPath)
+	_ = os.Remove(s.testDBPath)
+	_ = os.Remove(s.testConfigPath)
 
 	s.cancel()
 }
@@ -69,7 +69,7 @@ func (s *IntegrationTestSuite) TearDownSuite() {
 func (s *IntegrationTestSuite) SetupTest() {
 	// Ensure clean state for each test
 	s.cleanupTestProcesses()
-	os.Remove(s.testDBPath)
+	_ = os.Remove(s.testDBPath)
 }
 
 // TearDownTest runs after each test
@@ -149,7 +149,7 @@ func (s *IntegrationTestSuite) waitForService(port int, timeout time.Duration) e
 		case <-ticker.C:
 			conn, err := net.DialTimeout("tcp", fmt.Sprintf("localhost:%d", port), 100*time.Millisecond)
 			if err == nil {
-				conn.Close()
+				_ = conn.Close()
 				return nil
 			}
 		}
@@ -180,7 +180,7 @@ func (s *IntegrationTestSuite) TestHTTPAPIStartup() {
 
 	err := cmd.Start()
 	s.Require().NoError(err)
-	defer cmd.Process.Kill()
+	defer func() { _ = cmd.Process.Kill() }()
 
 	// Wait for server to be ready
 	err = s.waitForService(s.apiPort, 10*time.Second)
@@ -189,14 +189,14 @@ func (s *IntegrationTestSuite) TestHTTPAPIStartup() {
 	// Test health endpoint
 	resp, err := http.Get(s.baseURL + "/api/health")
 	s.NoError(err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	s.Equal(http.StatusOK, resp.StatusCode)
 
 	// Test leaderboard endpoint
 	resp, err = http.Get(s.baseURL + "/api/leaderboard")
 	s.NoError(err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	s.Equal(http.StatusOK, resp.StatusCode)
 }
@@ -209,7 +209,7 @@ func (s *IntegrationTestSuite) TestSSHServerStartup() {
 
 	err := cmd.Start()
 	s.Require().NoError(err)
-	defer cmd.Process.Kill()
+	defer func() { _ = cmd.Process.Kill() }()
 
 	// Wait for server to be ready
 	err = s.waitForService(s.sshPort, 10*time.Second)
@@ -227,13 +227,13 @@ func (s *IntegrationTestSuite) TestPlayerJourney() {
 		"--config", s.testConfigPath)
 	err = apiCmd.Start()
 	s.Require().NoError(err)
-	defer apiCmd.Process.Kill()
+	defer func() { _ = apiCmd.Process.Kill() }()
 
 	sshCmd := exec.CommandContext(s.ctx, "go", "run", "cmd/ssh-server/main.go",
 		"--config", s.testConfigPath)
 	err = sshCmd.Start()
 	s.Require().NoError(err)
-	defer sshCmd.Process.Kill()
+	defer func() { _ = sshCmd.Process.Kill() }()
 
 	// Wait for services to be ready
 	err = s.waitForService(s.apiPort, 10*time.Second)
@@ -245,23 +245,23 @@ func (s *IntegrationTestSuite) TestPlayerJourney() {
 	// Test player data retrieval
 	resp, err := http.Get(fmt.Sprintf("%s/api/players/%s", s.baseURL, player.ID))
 	s.NoError(err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	s.Equal(http.StatusOK, resp.StatusCode)
 
 	// Test leaderboard functionality
 	resp, err = http.Get(s.baseURL + "/api/leaderboard")
 	s.NoError(err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	s.Equal(http.StatusOK, resp.StatusCode)
 
 	// Test player leaderboard update
-	reqBody := strings.NewReader(fmt.Sprintf(`{
+	reqBody := strings.NewReader(`{
 		"keystrokes_per_second": 1.5,
 		"total_keystrokes": 100,
 		"level": 5
-	}`))
+	}`)
 
 	resp, err = http.Post(
 		fmt.Sprintf("%s/api/players/%s/leaderboard", s.baseURL, player.ID),
@@ -269,7 +269,7 @@ func (s *IntegrationTestSuite) TestPlayerJourney() {
 		reqBody,
 	)
 	s.NoError(err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	s.Equal(http.StatusOK, resp.StatusCode)
 }
@@ -281,7 +281,7 @@ func (s *IntegrationTestSuite) TestConcurrentSSHConnections() {
 		"--config", s.testConfigPath)
 	err := cmd.Start()
 	s.Require().NoError(err)
-	defer cmd.Process.Kill()
+	defer func() { _ = cmd.Process.Kill() }()
 
 	// Wait for server to be ready
 	err = s.waitForService(s.sshPort, 10*time.Second)
@@ -289,8 +289,8 @@ func (s *IntegrationTestSuite) TestConcurrentSSHConnections() {
 
 	// Generate test SSH keys
 	privateKeyFile, publicKeyFile := s.generateTestSSHKey()
-	defer os.Remove(privateKeyFile)
-	defer os.Remove(publicKeyFile)
+	defer func() { _ = os.Remove(privateKeyFile) }()
+	defer func() { _ = os.Remove(publicKeyFile) }()
 
 	// Create multiple concurrent connections
 	const numConnections = 5
@@ -328,7 +328,7 @@ func (s *IntegrationTestSuite) TestConcurrentSSHConnections() {
 				errors <- fmt.Errorf("failed to connect: %w", err)
 				return
 			}
-			defer conn.Close()
+			defer func() { _ = conn.Close() }()
 
 			// Keep connection alive briefly
 			time.Sleep(2 * time.Second)
@@ -401,7 +401,7 @@ func (s *IntegrationTestSuite) TestErrorHandling() {
 	invalidConfigPath := filepath.Join(os.TempDir(), "invalid_config.yaml")
 	err := os.WriteFile(invalidConfigPath, []byte("invalid: yaml: content:"), 0644)
 	s.Require().NoError(err)
-	defer os.Remove(invalidConfigPath)
+	defer func() { _ = os.Remove(invalidConfigPath) }()
 
 	// Try to start server with invalid config
 	cmd := exec.CommandContext(s.ctx, "go", "run", "cmd/term-idle/main.go",
@@ -426,12 +426,12 @@ func (s *IntegrationTestSuite) TestShutdownGraceful() {
 	s.Require().NoError(err)
 
 	// Wait for services to be ready
-	s.waitForService(s.apiPort, 10*time.Second)
-	s.waitForService(s.sshPort, 10*time.Second)
+	_ = s.waitForService(s.apiPort, 10*time.Second)
+	_ = s.waitForService(s.sshPort, 10*time.Second)
 
 	// Send interrupt signal to simulate graceful shutdown
-	apiCmd.Process.Signal(os.Interrupt)
-	sshCmd.Process.Signal(os.Interrupt)
+	_ = apiCmd.Process.Signal(os.Interrupt)
+	_ = sshCmd.Process.Signal(os.Interrupt)
 
 	// Wait for graceful shutdown
 	err = apiCmd.Wait()
@@ -464,7 +464,7 @@ func (h *TestIntegrationHelper) CreateMockPlayer(username string) *db.Player {
 
 // AssertAPIResponse asserts that an API response has the expected status and content
 func (h *TestIntegrationHelper) AssertAPIResponse(resp *http.Response, expectedStatus int, expectedContent string) {
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	h.suite.Equal(expectedStatus, resp.StatusCode)
 
