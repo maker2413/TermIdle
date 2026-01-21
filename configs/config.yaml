@@ -1,0 +1,33 @@
+# Term Idle SSH Server Configuration
+
+# SSH Server Settings
+ssh:
+  port: 2222                    # SSH server port
+  host_key_file: "./ssh_host_key" # Path to SSH host key file
+  max_sessions: 100             # Maximum concurrent sessions
+
+# Game Settings
+game:
+  save_interval: "30s"           # Auto-save interval
+  production_tick: "1s"          # Production calculation interval
+  max_players: 1000             # Maximum players supported
+  offline_production: true        # Continue production when offline
+
+# Database Settings
+database:
+  path: "./term_idle.db"         # SQLite database file path
+  max_connections: 10            # Maximum database connections
+  timeout: "30s"               # Database operation timeout
+
+# HTTP API Server (for leaderboards)
+server:
+  port: "8080"                  # HTTP server port
+  host: "0.0.0.0"              # Server bind address
+  read_timeout: "30s"            # HTTP read timeout
+  write_timeout: "30s"           # HTTP write timeout
+
+# Logging Configuration
+logging:
+  level: "info"                  # Log level: debug, info, warn, error
+  format: "text"                 # Log format: text, json
+  file: ""                       # Log file path (empty = stdout)

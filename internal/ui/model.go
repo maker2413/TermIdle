@@ -80,11 +80,6 @@ func (m Model) Init() tea.Cmd {
 	})
 }
 
-// tick is a helper for ticking
-func tick(d time.Duration, f func(time.Time) tea.Msg) tea.Cmd {
-	return tea.Tick(d, f)
-}
-
 // Update handles updates to the model
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
