@@ -168,6 +168,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.gameState.UpdateProduction()
 		m.lastUpdate = currentTime
 
+		// Check for story triggers
+		if newChapters := m.gameState.CheckStoryTriggers(); len(newChapters) > 0 {
+			// Auto-switch to story tab when new chapter unlocks
+			m.activeTab = "story"
+		}
+
 		return m, tea.Tick(time.Second, func(t time.Time) tea.Msg {
 			return ProductionTickMsg(t)
 		})
@@ -373,12 +379,41 @@ func (m Model) renderStoryView() string {
 	title := titleStyle.Render("📖 Story")
 	content := title + "\n\n"
 
-	if m.gameState.CurrentLevel == 1 {
-		content += "A monkey sits at a keyboard, randomly hitting keys...\n\n"
-		content += "Level up to unlock more of the story!\n"
-	} else {
-		content += "The monkey continues its journey...\n\n"
-		content += "More story content coming soon...\n"
+	if m.gameState.StoryManager == nil {
+		content += "Story system not initialized.\n"
+		content += "\n" + m.renderHelp()
+		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, content)
+	}
+
+	currentChapter := m.gameState.StoryManager.GetCurrentChapter()
+	if currentChapter == nil {
+		content += "No story chapters available.\n"
+		content += "\n" + m.renderHelp()
+		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, content)
+	}
+
+	// Chapter title and content
+	content += titleStyle.Render(fmt.Sprintf("Chapter %d: %s", currentChapter.ID, currentChapter.Title)) + "\n\n"
+
+	// Word wrap content for better display
+	content += fmt.Sprintf("%s\n\n", currentChapter.Content)
+
+	// Progress bar
+	progress := m.gameState.StoryManager.GetProgress()
+	progressBar := m.renderProgressBar(float64(int(progress)), 50)
+	content += fmt.Sprintf("Story Progress: %s %.1f%%\n\n", progressBar, progress)
+
+	// Next chapter hint
+	nextHint := m.gameState.StoryManager.GetHint(m.gameState)
+	content += fmt.Sprintf("📍 %s\n\n", nextHint)
+
+	// Chapter navigation info
+	unlockedChapters := m.gameState.StoryManager.GetUnlockedChapters()
+	content += fmt.Sprintf("Chapters Unlocked: %d / %d\n", len(unlockedChapters), 10)
+
+	// Mark current chapter as read if we're displaying it
+	if !currentChapter.IsRead {
+		m.gameState.StoryManager.MarkChapterRead(currentChapter.ID)
 	}
 
 	content += "\n" + m.renderHelp()
@@ -469,6 +504,29 @@ func (m *Model) handleUpgradePurchase() {
 	if err != nil {
 		m.gameState.AddNotification(fmt.Sprintf("❌ %s", err.Error()))
 	}
+}
+
+// renderProgressBar renders a simple progress bar
+func (m Model) renderProgressBar(progress float64, width int) string {
+	if width <= 0 {
+		width = 20
+	}
+
+	filled := int(progress * float64(width) / 100)
+	if filled > width {
+		filled = width
+	}
+
+	bar := ""
+	for i := 0; i < width; i++ {
+		if i < filled {
+			bar += "█"
+		} else {
+			bar += "░"
+		}
+	}
+
+	return fmt.Sprintf("[%s]", bar)
 }
 
 // handleAction handles main game actions

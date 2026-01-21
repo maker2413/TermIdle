@@ -1,6 +1,7 @@
 package game
 
 import (
+	"fmt"
 	"time"
 )
 
@@ -19,6 +20,7 @@ type GameState struct {
 	LastUpdate          time.Time           `json:"last_update"`
 	Notifications       []string            `json:"notifications"`
 	Upgrades            map[string]*Upgrade `json:"upgrades"`
+	StoryManager        *StoryManager       `json:"-"`
 }
 
 // Upgrade represents a purchased upgrade
@@ -66,6 +68,7 @@ func NewGameState(playerID string) *GameState {
 		LastUpdate:          time.Now(),
 		Notifications:       make([]string, 0),
 		Upgrades:            make(map[string]*Upgrade),
+		StoryManager:        NewStoryManager(),
 	}
 }
 
@@ -161,4 +164,18 @@ func (gs *GameState) TryFormResources() {
 		gs.AIAutomations++
 		gs.AddNotification("🤖 Built an AI automation!")
 	}
+}
+
+// CheckStoryTriggers checks for new story chapters and returns any newly unlocked ones
+func (gs *GameState) CheckStoryTriggers() []StoryChapter {
+	if gs.StoryManager == nil {
+		return nil
+	}
+
+	newChapters := gs.StoryManager.CheckTriggers(gs)
+	for _, chapter := range newChapters {
+		gs.AddNotification(fmt.Sprintf("📖 New Story Chapter Unlocked: %s", chapter.Title))
+	}
+
+	return newChapters
 }
