@@ -9,7 +9,7 @@ while :; do
     # -p: Run a single prompt in non-interactive mode
     # -q: Quiet mode (removes the spinner for cleaner logs)
     # The prompt is piped from your PROMPT.md file
-    cat PROMPT.md | opencode -p -q
+    opencode run "$(cat PLAN_PROMPT.md)" -m opencode/big-pickle
     
     # Check if the JTBD.md still has unchecked tasks
     # If no unchecked [ ] boxes remain, the project is complete.
